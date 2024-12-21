@@ -1,11 +1,11 @@
 /*
 Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -13,15 +13,20 @@ import (
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Initialize curl-echo and add to project.",
+	Long:  `Initializes curl-echo for your project. Defaults are listed.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("init called")
+		fmt.Println("curl-echo made with <3 by Andrés")
+		fmt.Print("Echoed responses folder: ")
+		fmt.Scanln() // Waits for enter and any text input
+		fmt.Print("Initializing curl-echo")
+
+		// Animate the dots for a loading effect
+		for i := 0; i < 3; i++ {
+			time.Sleep(500 * time.Millisecond) // Wait half a second
+			fmt.Print(".")
+		}
+		fmt.Println("\nInitialization complete!")
 	},
 }
 
