@@ -4,24 +4,13 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"bufio"
 	"fmt"
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/spf13/cobra"
+	"github.com/vebrasmusic/curl-echo/pkg/util"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
-
-	"github.com/spf13/cobra"
 )
-
-func showLoading(loading *bool) {
-	for *loading {
-		for _, r := range `-\|/` {
-			fmt.Printf("\rInitializing curl-echo... %c", r)
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-}
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
@@ -40,69 +29,11 @@ var initCmd = &cobra.Command{
 		fmt.Print(asciiTitle)
 		fmt.Println("made with <3 by andrés")
 
-		// Use bufio for input handling
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Folder path for storing echoed responses? [default: /echoes]: ")
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("Error reading input:", err)
-			return
-		}
-
-		// Trim input and set default if empty
-		echoPath := strings.TrimSpace(input)
-		if echoPath == "" {
-			echoPath = "/echoes"
-		}
-
-		// Display initializing message with loading animation
+		runInitSurvey()
 		loading := true
 		fmt.Print("Initializing curl-echo")
-		go showLoading(&loading)
-
-		// Get the current working directory
-		cwd, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("Failed to get current working directory: %v\n", err)
-			return
-		}
-
-		// Create the directory for echoed responses
-		echoDirPath := filepath.Join(cwd, echoPath) // Ensure path is relative to CWD
-		err = os.MkdirAll(echoDirPath, os.ModePerm)
-		if err != nil {
-			fmt.Printf("\nFailed to create directory %s: %v\n", echoDirPath, err)
-			return
-		}
-		fmt.Printf("\nDirectory created at %s\n", echoDirPath)
-
-		// Create and write to the configuration file in CWD
-		configFilePath := filepath.Join(cwd, "curl-echo.config.json")
-		file, err := os.Create(configFilePath)
-		if err != nil {
-			fmt.Printf("Failed to create file %s: %v\n", configFilePath, err)
-			return
-		}
-		defer func(file *os.File) {
-			err := file.Close()
-			if err != nil {
-				if err != nil {
-					fmt.Printf("Failed to create file %s: %v\n", configFilePath, err)
-					return
-				}
-			}
-		}(file)
-
-		content := `{
-    "echoPath": "` + echoPath + `",
-    "configVersion": "1.0.0",
-}`
-		_, err = file.Write([]byte(content))
-		if err != nil {
-			fmt.Printf("Failed to write to file %s: %v\n", configFilePath, err)
-			return
-		}
-		fmt.Printf("Config file created at %s\n", configFilePath)
+		go util.ShowLoading(&loading)
+		createDirectories()
 		fmt.Println("Initialization complete!")
 	},
 }
@@ -119,4 +50,74 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// initCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func runInitSurvey() {
+	questions := []*survey.Question{
+		{
+			Name:     "affirmation",
+			Prompt:   &survey.Select{Message: "Init curl-echo in your project?:", Options: []string{"yes", "no"}},
+			Validate: survey.Required,
+		},
+	}
+
+	answers := struct {
+		Affirmation string
+	}{}
+
+	err := survey.Ask(questions, &answers)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	if answers.Affirmation == "no" {
+		fmt.Println("Initialization aborted by user.")
+		os.Exit(0)
+	}
+}
+
+func createDirectories() {
+	// Get the current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Failed to get current working directory: %v\n", err)
+		return
+	}
+
+	folders := []string{
+		"curl-echo/echoes",
+	}
+
+	for index, folder := range folders {
+		fmt.Println(index, folder)
+		path := filepath.Join(cwd, folder)
+		err := os.MkdirAll(path, os.ModePerm)
+		if err != nil {
+			fmt.Printf("Failed to create directory: %v\n", err)
+			return
+		}
+	}
+	fmt.Printf("\nFolder structure created")
+
+	// Create and write to the configuration file in CWD
+	apiFilePath := filepath.Join(cwd, "/curl-echo/apis.json")
+	file, err := os.Create(apiFilePath)
+	if err != nil {
+		fmt.Printf("Failed to create file %s: %v\n", apiFilePath, err)
+		return
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Failed to close file %s: %v\n", apiFilePath, err)
+		}
+	}()
+
+	content := `[]`
+	_, err = file.Write([]byte(content))
+	if err != nil {
+		fmt.Printf("Failed to write to file %s: %v\n", apiFilePath, err)
+		return
+	}
+	fmt.Printf("\nApi spec file created")
 }
