@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
-	"io/ioutil"
+	"github.com/vebrasmusic/curl-echo/pkg"
+	"github.com/vebrasmusic/curl-echo/pkg/util"
 	"os"
 )
 
@@ -45,14 +46,7 @@ Once configured, the route will be added to the curl-echo registry, making it av
 	},
 }
 
-type ApiRoute struct {
-	Nickname   string `json:"nickname"`
-	Group      string `json:"group"`
-	Route      string `json:"route"`
-	HTTPMethod string `json:"http_method"`
-}
-
-func runAddSurvey() ApiRoute {
+func runAddSurvey() pkg.ApiRoute {
 	questions := []*survey.Question{
 		{
 			Name:     "nickname",
@@ -89,7 +83,7 @@ func runAddSurvey() ApiRoute {
 		os.Exit(1)
 	}
 
-	apiRoute := ApiRoute{
+	apiRoute := pkg.ApiRoute{
 		Nickname:   answers.Nickname,
 		Group:      answers.Group,
 		Route:      answers.Route,
@@ -99,39 +93,21 @@ func runAddSurvey() ApiRoute {
 	return apiRoute
 }
 
-func addToApiJson(apiRoute *ApiRoute) {
-	const filePath = "curl-echo/apis.json"
-
-	// Open the file
-	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		fmt.Printf("Failed to open file: %v\n", err)
+func addToApiJson(apiRoute *pkg.ApiRoute) {
+	// Load the API routes and file
+	apiRoutes, file := util.LoadApiJson()
+	if file == nil {
+		fmt.Println("Failed to load API JSON file")
 		return
 	}
+
+	// Ensure the file is closed after all operations
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
 			fmt.Printf("Failed to close file: %v\n", err)
 		}
 	}(file)
-
-	// Read the current content of the file
-	fileData, err := ioutil.ReadAll(file)
-	if err != nil {
-		fmt.Printf("Failed to read file: %v\n", err)
-		return
-	}
-
-	// Initialize the list of API routes
-	var apiRoutes []ApiRoute
-	if len(fileData) > 0 {
-		// Parse existing data
-		err = json.Unmarshal(fileData, &apiRoutes)
-		if err != nil {
-			fmt.Printf("Failed to parse JSON: %v\n", err)
-			return
-		}
-	}
 
 	// Append the new API route
 	apiRoutes = append(apiRoutes, *apiRoute)
