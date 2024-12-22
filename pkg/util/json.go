@@ -8,6 +8,34 @@ import (
 	"os"
 )
 
+type FilterSpec struct {
+	Param     string
+	ParamType string
+}
+
+var filterFunctions = map[string]func(pkg.ApiRoute) string{
+	"Nickname": func(r pkg.ApiRoute) string { return r.Nickname },
+	"Group":    func(r pkg.ApiRoute) string { return r.Group },
+	"Route":    func(r pkg.ApiRoute) string { return r.Route },
+}
+
+func FilterRoutes(array []pkg.ApiRoute, spec FilterSpec) []pkg.ApiRoute {
+	// filter based on the cmd line arg
+	var filteredApiRoutes []pkg.ApiRoute
+
+	filterFunction, exists := filterFunctions[spec.Param]
+	if !exists {
+		fmt.Println("Filter function error")
+		return nil
+	}
+	for _, apiRoute := range array {
+		if filterFunction(apiRoute) == spec.Param {
+			filteredApiRoutes = append(filteredApiRoutes, apiRoute)
+		}
+	}
+	return filteredApiRoutes
+}
+
 func LoadApiJson() ([]pkg.ApiRoute, *os.File) {
 	const filePath = "curl-echo/apis.json"
 

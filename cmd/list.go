@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/vebrasmusic/curl-echo/pkg"
 	"github.com/vebrasmusic/curl-echo/pkg/util"
 
 	"github.com/spf13/cobra"
@@ -60,7 +59,11 @@ Ensure your configuration defines valid groups for accurate filtering.`,
 		apiRoutes, _ := util.LoadApiJson()
 		// Filter routes by group if the --group flag is provided
 		if group != "" {
-			apiRoutes = filter(apiRoutes, group)
+			filterSpec := util.FilterSpec{
+				Param:     group,
+				ParamType: "Group",
+			}
+			apiRoutes = util.FilterRoutes(apiRoutes, filterSpec)
 		}
 		if (apiRoutes == nil) || (len(apiRoutes) == 0) {
 			fmt.Println("No routes found. Try 'curl-echo add' to add some new routes.")
@@ -77,28 +80,9 @@ Ensure your configuration defines valid groups for accurate filtering.`,
 	},
 }
 
-func filter(array []pkg.ApiRoute, group string) []pkg.ApiRoute {
-	// filter based on the cmd line arg
-	var filteredApiRoutes []pkg.ApiRoute
-	for _, apiRoute := range array {
-		if apiRoute.Group == group {
-			filteredApiRoutes = append(filteredApiRoutes, apiRoute)
-		}
-	}
-	return filteredApiRoutes
-}
-
 func init() {
 	rootCmd.AddCommand(listCmd)
 
 	listCmd.Flags().StringVarP(&group, "group", "g", "", "Filter by group name")
-	// Here you will define your flags and configuration settings.
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
