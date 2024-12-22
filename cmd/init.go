@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
+	"github.com/vebrasmusic/curl-echo/pkg"
 	"github.com/vebrasmusic/curl-echo/pkg/util"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 // initCmd represents the init command
@@ -29,95 +31,98 @@ var initCmd = &cobra.Command{
 		fmt.Print(asciiTitle)
 		fmt.Println("made with <3 by andrés")
 
-		runInitSurvey()
+		config := runInitSurvey()
 		loading := true
-		fmt.Print("Initializing curl-echo")
 		go util.ShowLoading(&loading)
-		createDirectories()
-		fmt.Println("Initialization complete!")
+		createFiles(config)
+		fmt.Println("\nInitialization complete!")
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// initCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func runInitSurvey() {
-	questions := []*survey.Question{
-		{
-			Name:     "affirmation",
-			Prompt:   &survey.Select{Message: "Init curl-echo in your project?:", Options: []string{"yes", "no"}},
-			Validate: survey.Required,
-		},
+func runInitSurvey() pkg.Config {
+	// Confirmation question
+	confirmation := false
+	confirmationQuestion := &survey.Confirm{
+		Message: `Ready to init curl-echo in your project? This will create a 'curl-echo' directory.`,
 	}
 
-	answers := struct {
-		Affirmation string
-	}{}
-
-	err := survey.Ask(questions, &answers)
+	// Ask the confirmation question
+	err := survey.AskOne(confirmationQuestion, &confirmation)
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
 
-	if answers.Affirmation == "no" {
-		fmt.Println("Initialization aborted by user.")
-		os.Exit(0)
+	// If not confirmed, abort
+	if !confirmation {
+		fmt.Println("Aborted. curl-echo was not initialized.")
+		os.Exit(1)
+	}
+
+	// Input question
+	var rootApiPath string
+	inputQuestion := &survey.Input{
+		Message: "What's the root path of your API? (ie. http://localhost:8080/api): ",
+	}
+	err = survey.AskOne(inputQuestion, &rootApiPath, survey.WithValidator(survey.Required))
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	var maxEchoTimeout int
+	defaultTimeout := 20
+
+	timeoutQuestion := &survey.Input{
+		Message: fmt.Sprintf("Set the max timeout (secs) for an echo response (default: %d): ", defaultTimeout),
+	}
+
+	var timeoutInput string
+	err1 := survey.AskOne(timeoutQuestion, &timeoutInput)
+	if err1 != nil {
+		fmt.Printf("Error: %v\n", err1)
+		os.Exit(1)
+	}
+
+	// Handle user input: if empty, use default value; if not, parse to int
+	if timeoutInput == "" {
+		maxEchoTimeout = defaultTimeout
+	} else {
+		maxEchoTimeout, err = strconv.Atoi(timeoutInput)
+		if err != nil {
+			fmt.Printf("Invalid input. Please enter a number.\n")
+			os.Exit(1)
+		}
+	}
+
+	fmt.Println("Confirmed. Initializing curl-echo with root API path:", rootApiPath)
+	return pkg.Config{
+		RootApiPath:    rootApiPath,
+		MaxEchoTimeout: maxEchoTimeout,
 	}
 }
 
-func createDirectories() {
-	// Get the current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Failed to get current working directory: %v\n", err)
-		return
-	}
+func createFiles(config pkg.Config) {
 
 	folders := []string{
-		"curl-echo/echoes",
+		"echoes",
 	}
 
 	for index, folder := range folders {
 		fmt.Println(index, folder)
-		path := filepath.Join(cwd, folder)
-		err := os.MkdirAll(path, os.ModePerm)
-		if err != nil {
-			fmt.Printf("Failed to create directory: %v\n", err)
-			return
-		}
+		util.CreateFolders(folder)
 	}
 	fmt.Printf("\nFolder structure created")
+	cwd, _ := os.Getwd()
 
 	// Create and write to the configuration file in CWD
-	apiFilePath := filepath.Join(cwd, "/curl-echo/apis.json")
-	file, err := os.Create(apiFilePath)
-	if err != nil {
-		fmt.Printf("Failed to create file %s: %v\n", apiFilePath, err)
-		return
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Printf("Failed to close file %s: %v\n", apiFilePath, err)
-		}
-	}()
+	filePath := filepath.Join(cwd, "curl-echo")
+	apiRoutes := []pkg.ApiRoute{}
+	util.CreateJson(filePath, apiRoutes, "apis.json")
 
-	content := `[]`
-	_, err = file.Write([]byte(content))
-	if err != nil {
-		fmt.Printf("Failed to write to file %s: %v\n", apiFilePath, err)
-		return
-	}
-	fmt.Printf("\nApi spec file created")
+	util.CreateJson(filePath, config, "config.json")
 }
