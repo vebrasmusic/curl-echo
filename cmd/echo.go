@@ -74,11 +74,22 @@ Examples:
 		switch {
 		case routeToEcho != "":
 			fmt.Printf("Echoing route: %s...\n", routeToEcho)
+			filteredRoutes, _ := util.FilterApiRoutes(apiRoutes, func(r pkg.ApiRoute) bool {
+				return r.Route == routeToEcho
+			})
+			echo(filteredRoutes)
 		case nicknameToEcho != "":
 			fmt.Printf("Echoing nickname: %s...\n", nicknameToEcho)
+			filteredRoutes, _ := util.FilterApiRoutes(apiRoutes, func(r pkg.ApiRoute) bool {
+				return r.Nickname == nicknameToEcho
+			})
+			echo(filteredRoutes)
 		case groupToEcho != "":
-			fmt.Printf("Echoing group: %s...\n", group)
-			//apiRoutes = apiRoutes.where
+			fmt.Printf("Echoing group: %s...\n", groupToEcho)
+			filteredRoutes, _ := util.FilterApiRoutes(apiRoutes, func(r pkg.ApiRoute) bool {
+				return r.Group == groupToEcho
+			})
+			echo(filteredRoutes)
 		default:
 			fmt.Println("Echoing all available routes...")
 			echo(apiRoutes)

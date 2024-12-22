@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/vebrasmusic/curl-echo/pkg"
 	"github.com/vebrasmusic/curl-echo/pkg/util"
 
 	"github.com/spf13/cobra"
@@ -63,11 +64,9 @@ Ensure your configuration defines valid groups for accurate filtering.`,
 		}
 		// Filter routes by group if the --group flag is provided
 		if group != "" {
-			filterSpec := util.FilterSpec{
-				Param:     group,
-				ParamType: "Group",
-			}
-			apiRoutes, err = util.FilterRoutes(apiRoutes, filterSpec)
+			apiRoutes, err = util.FilterApiRoutes(apiRoutes, func(r pkg.ApiRoute) bool {
+				return r.Group == group
+			})
 			if err != nil {
 				fmt.Println(err)
 				return
