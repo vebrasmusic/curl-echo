@@ -17,10 +17,12 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/go-resty/resty/v2"
 	"github.com/spf13/cobra"
 	"github.com/vebrasmusic/curl-echo/pkg"
 	"github.com/vebrasmusic/curl-echo/pkg/util"
 	"os"
+	"path/filepath"
 )
 
 var (
@@ -29,9 +31,11 @@ var (
 	groupToEcho    string
 )
 
+var client = resty.New()
+
 // echoCmd represents the echo command
 var echoCmd = &cobra.Command{
-	Use:   "curl-echo echo [-r route] [-n nickname] [-g groupToEcho]",
+	Use:   "echo [-r route] [-n nickname] [-g groupToEcho]",
 	Short: "Run API routes and save their responses to files.",
 	Long: `The "curl-echo echo" command runs API routes defined in the "apis.json" file and echoes their responses to files.
 
@@ -71,6 +75,12 @@ Examples:
 			fmt.Println("Echoing all available routes...")
 		}
 
+		apiRoutes, _, err := util.LoadApiJson()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		echo(apiRoutes)
 		loading = false
 	},
 }
@@ -81,18 +91,30 @@ func echo(apiRoutes []pkg.ApiRoute) {
 		os.Exit(0)
 	}
 	for _, apiRoute := range apiRoutes {
-		// in curl-echo/echoes, create folder for group if not already there
-
-		// create file titled {nickname}.json, or if it exists already override
+		cwd, _ := os.Getwd()
+		path := filepath.Join(cwd, "curl-echo", "echoes")
+		if apiRoute.Group != "" {
+			path += "/" + apiRoute.Group
+			folderPath := "echoes/" + apiRoute.Group
+			util.CreateFolders(folderPath)
+		}
 
 		// run curl cmd w the api route
+		response, err := runGetRequest(apiRoute)
+		if err != nil {
+			fmt.Println("Error while executing request:", err)
+			// add to log here
+			continue
+		}
 
-		// copy full response (headers, body, all that) into the json file
+		content, err := util.ParseHttpToJson(response)
+		if err != nil {
+			fmt.Println("Error while parsing response:", err)
+			continue
+		}
 
-		// close and save, or if error then skip that one and write to echo.log. if it works, just write "route: xxx successfully echoed."
-
-		// stop loading,
-
+		fileName := apiRoute.Nickname + ".json"
+		util.CreateJson(path, content, fileName)
 		// if timeout reached, exit w/ error timeout and log that too
 	}
 }
@@ -115,6 +137,20 @@ func countFlags() {
 		fmt.Println("Error: Only one of 'route', 'nickname', or 'group' can be specified at a time.")
 		os.Exit(1)
 	}
+}
+
+func runGetRequest(apiRoute pkg.ApiRoute) (*resty.Response, error) {
+	// Create a Resty Client
+	// TODO: add reading the config to find the root path
+	resp, err := client.R().
+		EnableTrace().
+		Get(apiRoute.Route)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		return nil, fmt.Errorf("failed to make GET request: %w", err)
+	}
+	return resp, nil
 }
 
 func init() {

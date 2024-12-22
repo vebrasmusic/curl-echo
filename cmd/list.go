@@ -56,7 +56,11 @@ Replace "<group>" with the desired group name, e.g., "studies".
 
 Ensure your configuration defines valid groups for accurate filtering.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		apiRoutes, _ := util.LoadApiJson()
+		apiRoutes, _, err := util.LoadApiJson()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 		// Filter routes by group if the --group flag is provided
 		if group != "" {
 			filterSpec := util.FilterSpec{

@@ -55,7 +55,7 @@ func runAddSurvey() pkg.ApiRoute {
 		},
 		{
 			Name:     "group",
-			Prompt:   &survey.Input{Message: "Enter the group this api should be long to: "},
+			Prompt:   &survey.Input{Message: "Enter the group this api should belong to: "},
 			Validate: survey.Required,
 		},
 		{
@@ -95,8 +95,8 @@ func runAddSurvey() pkg.ApiRoute {
 
 func addToApiJson(apiRoute *pkg.ApiRoute) {
 	// Load the API routes and file
-	apiRoutes, file := util.LoadApiJson()
-	if file == nil {
+	apiRoutes, file, err := util.LoadApiJson()
+	if err != nil {
 		fmt.Println("Failed to load API JSON file")
 		return
 	}
