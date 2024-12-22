@@ -11,6 +11,7 @@ import (
 	"github.com/vebrasmusic/curl-echo/pkg/util"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 // initCmd represents the init command
@@ -30,10 +31,10 @@ var initCmd = &cobra.Command{
 		fmt.Print(asciiTitle)
 		fmt.Println("made with <3 by andrés")
 
-		runInitSurvey()
+		config := runInitSurvey()
 		loading := true
 		go util.ShowLoading(&loading)
-		createFiles()
+		createFiles(config)
 		fmt.Println("\nInitialization complete!")
 	},
 }
@@ -42,30 +43,70 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 }
 
-func runInitSurvey() {
-	question := &survey.Confirm{
-		Message: `Ready to init curl-echo in your project? This will create a 'curl-echo' directory.
-If you want to remove 'curl-echo' from your project in the future, you can with the cmd 'curl-echo rm'`,
+func runInitSurvey() pkg.Config {
+	// Confirmation question
+	confirmation := false
+	confirmationQuestion := &survey.Confirm{
+		Message: `Ready to init curl-echo in your project? This will create a 'curl-echo' directory.`,
 	}
-	var confirmation bool
 
-	// Run the survey
-	err := survey.AskOne(question, &confirmation)
+	// Ask the confirmation question
+	err := survey.AskOne(confirmationQuestion, &confirmation)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if confirmation {
-		fmt.Println("Confirmed. Initializing curl-echo...")
-		return
+	// If not confirmed, abort
+	if !confirmation {
+		fmt.Println("Aborted. curl-echo was not initialized.")
+		os.Exit(1)
 	}
 
-	fmt.Println("Aborted. curl-echo was not initialized.")
-	os.Exit(1)
+	// Input question
+	var rootApiPath string
+	inputQuestion := &survey.Input{
+		Message: "What's the root path of your API? (ie. http://localhost:8080/api): ",
+	}
+	err = survey.AskOne(inputQuestion, &rootApiPath, survey.WithValidator(survey.Required))
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	var maxEchoTimeout int
+	defaultTimeout := 20
+
+	timeoutQuestion := &survey.Input{
+		Message: fmt.Sprintf("Set the max timeout (secs) for an echo response (default: %d): ", defaultTimeout),
+	}
+
+	var timeoutInput string
+	err1 := survey.AskOne(timeoutQuestion, &timeoutInput)
+	if err1 != nil {
+		fmt.Printf("Error: %v\n", err1)
+		os.Exit(1)
+	}
+
+	// Handle user input: if empty, use default value; if not, parse to int
+	if timeoutInput == "" {
+		maxEchoTimeout = defaultTimeout
+	} else {
+		maxEchoTimeout, err = strconv.Atoi(timeoutInput)
+		if err != nil {
+			fmt.Printf("Invalid input. Please enter a number.\n")
+			os.Exit(1)
+		}
+	}
+
+	fmt.Println("Confirmed. Initializing curl-echo with root API path:", rootApiPath)
+	return pkg.Config{
+		RootApiPath:    rootApiPath,
+		MaxEchoTimeout: maxEchoTimeout,
+	}
 }
 
-func createFiles() {
+func createFiles(config pkg.Config) {
 
 	folders := []string{
 		"echoes",
@@ -83,9 +124,5 @@ func createFiles() {
 	apiRoutes := []pkg.ApiRoute{}
 	util.CreateJson(filePath, apiRoutes, "apis.json")
 
-	var config = pkg.Config{
-		RootApiPath:    "",
-		MaxEchoTimeout: 0,
-	}
 	util.CreateJson(filePath, config, "config.json")
 }

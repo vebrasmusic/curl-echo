@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 var (
@@ -33,9 +34,8 @@ var (
 	groupToEcho    string
 )
 
-var client = resty.New()
+var client *resty.Client
 
-// echoCmd represents the echo command
 var echoCmd = &cobra.Command{
 	Use:   "echo [-r route] [-n nickname] [-g groupToEcho]",
 	Short: "Run API routes and save their responses to files.",
@@ -61,6 +61,7 @@ Examples:
 4. Run all routes in a group:
    curl-echo echo -g "admin"`,
 	Run: func(cmd *cobra.Command, args []string) {
+		initRestyClient()
 		loading := true
 		go util.ShowLoading(&loading)
 		// if more than 1 is defined, throw error
@@ -96,6 +97,18 @@ Examples:
 		}
 		loading = false
 	},
+}
+
+func initRestyClient() {
+	config, err := util.LoadConfigJson() // Load your configuration file
+	if err != nil {
+		fmt.Printf("Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize Resty with a timeout from config
+	client = resty.New().
+		SetTimeout(time.Duration(config.MaxEchoTimeout) * time.Second)
 }
 
 func echo(apiRoutes []pkg.ApiRoute) {
@@ -157,7 +170,7 @@ func constructCompleteRoute(apiRoute pkg.ApiRoute) string {
 		os.Exit(1)
 	}
 
-	return config.RootApiPath + apiRoute.Route
+	return config.RootApiPath + "/" + apiRoute.Route
 }
 
 func runGetRequest(apiRoute pkg.ApiRoute) (*resty.Response, error) {
