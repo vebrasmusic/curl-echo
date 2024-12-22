@@ -78,27 +78,17 @@ func runInitSurvey() {
 }
 
 func createDirectories() {
-	// Get the current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Failed to get current working directory: %v\n", err)
-		return
-	}
 
 	folders := []string{
-		"curl-echo/echoes",
+		"echoes",
 	}
 
 	for index, folder := range folders {
 		fmt.Println(index, folder)
-		path := filepath.Join(cwd, folder)
-		err := os.MkdirAll(path, os.ModePerm)
-		if err != nil {
-			fmt.Printf("Failed to create directory: %v\n", err)
-			return
-		}
+		util.CreateFolders(folder)
 	}
 	fmt.Printf("\nFolder structure created")
+	cwd, _ := os.Getwd()
 
 	// Create and write to the configuration file in CWD
 	apiFilePath := filepath.Join(cwd, "/curl-echo/apis.json")
