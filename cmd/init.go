@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
+	"github.com/vebrasmusic/curl-echo/pkg"
 	"github.com/vebrasmusic/curl-echo/pkg/util"
 	"os"
 	"path/filepath"
@@ -32,7 +33,7 @@ var initCmd = &cobra.Command{
 		runInitSurvey()
 		loading := true
 		go util.ShowLoading(&loading)
-		createDirectories()
+		createFiles()
 		fmt.Println("\nInitialization complete!")
 	},
 }
@@ -64,7 +65,7 @@ If you want to remove 'curl-echo' from your project in the future, you can with 
 	os.Exit(1)
 }
 
-func createDirectories() {
+func createFiles() {
 
 	folders := []string{
 		"echoes",
@@ -78,6 +79,13 @@ func createDirectories() {
 	cwd, _ := os.Getwd()
 
 	// Create and write to the configuration file in CWD
-	apiFilePath := filepath.Join(cwd, "curl-echo")
-	util.CreateJson(apiFilePath, "[]", "apis.json")
+	filePath := filepath.Join(cwd, "curl-echo")
+	apiRoutes := []pkg.ApiRoute{}
+	util.CreateJson(filePath, apiRoutes, "apis.json")
+
+	var config = pkg.Config{
+		RootApiPath:    "",
+		MaxEchoTimeout: 0,
+	}
+	util.CreateJson(filePath, config, "config.json")
 }

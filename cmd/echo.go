@@ -16,11 +16,13 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/spf13/cobra"
 	"github.com/vebrasmusic/curl-echo/pkg"
 	"github.com/vebrasmusic/curl-echo/pkg/util"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -64,6 +66,11 @@ Examples:
 		// if more than 1 is defined, throw error
 		countFlags()
 		// choose path based on what was chosen
+		apiRoutes, _, err := util.LoadApiJson()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 		switch {
 		case routeToEcho != "":
 			fmt.Printf("Echoing route: %s...\n", routeToEcho)
@@ -71,16 +78,11 @@ Examples:
 			fmt.Printf("Echoing nickname: %s...\n", nicknameToEcho)
 		case groupToEcho != "":
 			fmt.Printf("Echoing group: %s...\n", group)
+			//apiRoutes = apiRoutes.where
 		default:
 			fmt.Println("Echoing all available routes...")
+			echo(apiRoutes)
 		}
-
-		apiRoutes, _, err := util.LoadApiJson()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		echo(apiRoutes)
 		loading = false
 	},
 }
@@ -98,24 +100,21 @@ func echo(apiRoutes []pkg.ApiRoute) {
 			folderPath := "echoes/" + apiRoute.Group
 			util.CreateFolders(folderPath)
 		}
+		filePath := apiRoute.Nickname + ".json"
 
-		// run curl cmd w the api route
+		// TODO: implement for other HTTP methods
 		response, err := runGetRequest(apiRoute)
 		if err != nil {
 			fmt.Println("Error while executing request:", err)
 			// add to log here
 			continue
 		}
-
-		content, err := util.ParseHttpToJson(response)
+		responseContent, err := parseHttp(response)
 		if err != nil {
 			fmt.Println("Error while parsing response:", err)
 			continue
 		}
-
-		fileName := apiRoute.Nickname + ".json"
-		util.CreateJson(path, content, fileName)
-		// if timeout reached, exit w/ error timeout and log that too
+		util.CreateJson(path, responseContent, filePath)
 	}
 }
 
@@ -139,18 +138,54 @@ func countFlags() {
 	}
 }
 
+func constructCompleteRoute(apiRoute pkg.ApiRoute) string {
+	// read config.json.rootApiPath
+	config, err := util.LoadConfigJson()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	return config.RootApiPath + apiRoute.Route
+}
+
 func runGetRequest(apiRoute pkg.ApiRoute) (*resty.Response, error) {
 	// Create a Resty Client
 	// TODO: add reading the config to find the root path
 	resp, err := client.R().
 		EnableTrace().
-		Get(apiRoute.Route)
+		Get(constructCompleteRoute(apiRoute))
 
 	if err != nil {
 		fmt.Println("Error:", err)
 		return nil, fmt.Errorf("failed to make GET request: %w", err)
 	}
 	return resp, nil
+}
+
+func parseHttp(resp *resty.Response) (pkg.ResponseContent, error) {
+	// Populate the ResponseContent struct
+	content := pkg.ResponseContent{
+		StatusCode: resp.StatusCode(),
+		Body:       make(map[string]interface{}),
+		Headers:    make(map[string]string),
+	}
+
+	// Parse the response body into a map
+	err := json.Unmarshal(resp.Body(), &content.Body)
+	if err != nil {
+		log.Printf("Error unmarshalling response body: %v", err)
+		return pkg.ResponseContent{}, err
+	}
+
+	// Populate headers
+	for k, v := range resp.Header() {
+		if len(v) > 0 {
+			content.Headers[k] = v[0] // Use the first value if multiple
+		}
+	}
+
+	return content, nil
 }
 
 func init() {

@@ -3,10 +3,8 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-resty/resty/v2"
 	"github.com/vebrasmusic/curl-echo/pkg"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 )
@@ -39,39 +37,73 @@ func FilterRoutes(array []pkg.ApiRoute, spec FilterSpec) []pkg.ApiRoute {
 	return filteredApiRoutes
 }
 
-func LoadApiJson() ([]pkg.ApiRoute, *os.File, error) {
-	const filePath = "curl-echo/apis.json"
-
+func LoadJsonFromFile[T any](filePath string) (T, *os.File, error) {
 	// Open the file
 	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		fmt.Printf("Failed to open file: %v\n", err)
-		return nil, nil, err
+		var zero T
+		return zero, nil, err
 	}
 
 	// Read the current content of the file
 	fileData, err := ioutil.ReadAll(file)
 	if err != nil {
 		fmt.Printf("Failed to read file: %v\n", err)
-		return nil, nil, err
+		var zero T
+		return zero, nil, err
 	}
 
-	// Initialize the list of API routes
-	var apiRoutes []pkg.ApiRoute
+	// Initialize the target object
+	var result T
 	if len(fileData) > 0 {
 		// Parse existing data
-		err = json.Unmarshal(fileData, &apiRoutes)
+		err = json.Unmarshal(fileData, &result)
 		if err != nil {
 			fmt.Printf("Failed to parse JSON: %v\n", err)
-			return nil, nil, err
+			var zero T
+			return zero, nil, err
 		}
+	}
+
+	return result, file, nil
+}
+
+func LoadConfigJson() (pkg.Config, error) {
+	filePath := "curl-echo/config.json"
+
+	config, _, err := LoadJsonFromFile[pkg.Config](filePath)
+	if err != nil {
+		fmt.Printf("Failed to load config file: %v\n", err)
+		return pkg.Config{}, err
+	}
+	return config, nil
+}
+
+func LoadApiJson() ([]pkg.ApiRoute, *os.File, error) {
+	filePath := "curl-echo/apis.json"
+
+	// Use the generic JSON loader
+	apiRoutes, file, err := LoadJsonFromFile[[]pkg.ApiRoute](filePath)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return apiRoutes, file, nil
 }
 
-func CreateJson(filePath string, content string, fileName string) {
+func CreateJson[T any](filePath string, data T, fileName string) {
+	// Marshal the data into JSON
+	jsonData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		fmt.Printf("Failed to marshal data to JSON: %v\n", err)
+		return
+	}
+
+	// Construct the full file path
 	path := filepath.Join(filePath, fileName)
+
+	// Create the file
 	file, err := os.Create(path)
 	if err != nil {
 		fmt.Printf("Failed to create file %s: %v\n", path, err)
@@ -84,47 +116,11 @@ func CreateJson(filePath string, content string, fileName string) {
 		}
 	}()
 
-	_, err = file.Write([]byte(content))
+	// Write the JSON data to the file
+	_, err = file.Write(jsonData)
 	if err != nil {
 		fmt.Printf("Failed to write to file %s: %v\n", path, err)
 		return
 	}
-	fmt.Printf("\nFile %s created\n", path)
-}
-
-type ResponseContent struct {
-	StatusCode int                    `json:"statusCode"`
-	Body       map[string]interface{} `json:"body"`
-	Headers    map[string]string      `json:"headers"`
-}
-
-func ParseHttpToJson(resp *resty.Response) (string, error) {
-	// Populate the ResponseContent struct
-	content := ResponseContent{
-		StatusCode: resp.StatusCode(),
-		Body:       make(map[string]interface{}),
-		Headers:    make(map[string]string),
-	}
-
-	// Parse the response body into a map
-	err := json.Unmarshal(resp.Body(), &content.Body)
-	if err != nil {
-		log.Fatalf("Error unmarshalling response body: %v", err)
-		return "", err
-	}
-
-	// Populate headers
-	for k, v := range resp.Header() {
-		content.Headers[k] = v[0] // Use the first value if multiple
-	}
-
-	// Convert the struct to JSON
-	finalJSON, err := json.MarshalIndent(content, "", "  ")
-	if err != nil {
-		log.Fatalf("Error marshalling JSON: %v", err)
-		return "", err
-	}
-
-	// Print the result
-	return string(finalJSON), nil
+	fmt.Printf("\nFile %s created successfully.\n", path)
 }
