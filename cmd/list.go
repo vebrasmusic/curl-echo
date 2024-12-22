@@ -67,7 +67,11 @@ Ensure your configuration defines valid groups for accurate filtering.`,
 				Param:     group,
 				ParamType: "Group",
 			}
-			apiRoutes = util.FilterRoutes(apiRoutes, filterSpec)
+			apiRoutes, err = util.FilterRoutes(apiRoutes, filterSpec)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 		}
 		if (apiRoutes == nil) || (len(apiRoutes) == 0) {
 			fmt.Println("No routes found. Try 'curl-echo add' to add some new routes.")

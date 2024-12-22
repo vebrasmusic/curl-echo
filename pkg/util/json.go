@@ -14,27 +14,29 @@ type FilterSpec struct {
 	ParamType string
 }
 
+// Filter function map with cleaner usage of function types
 var filterFunctions = map[string]func(pkg.ApiRoute) string{
 	"Nickname": func(r pkg.ApiRoute) string { return r.Nickname },
 	"Group":    func(r pkg.ApiRoute) string { return r.Group },
 	"Route":    func(r pkg.ApiRoute) string { return r.Route },
 }
 
-func FilterRoutes(array []pkg.ApiRoute, spec FilterSpec) []pkg.ApiRoute {
-	// filter based on the cmd line arg
-	var filteredApiRoutes []pkg.ApiRoute
-
-	filterFunction, exists := filterFunctions[spec.Param]
+func FilterRoutes(array []pkg.ApiRoute, spec FilterSpec) ([]pkg.ApiRoute, error) {
+	// Lookup filter function based on ParamType
+	filterFunction, exists := filterFunctions[spec.ParamType]
 	if !exists {
-		fmt.Println("Filter function error")
-		return nil
+		return nil, fmt.Errorf("unknown filter type: %s", spec.ParamType)
 	}
+
+	// Filter the routes
+	var filteredApiRoutes []pkg.ApiRoute
 	for _, apiRoute := range array {
 		if filterFunction(apiRoute) == spec.Param {
 			filteredApiRoutes = append(filteredApiRoutes, apiRoute)
 		}
 	}
-	return filteredApiRoutes
+
+	return filteredApiRoutes, nil
 }
 
 func LoadJsonFromFile[T any](filePath string) (T, *os.File, error) {
